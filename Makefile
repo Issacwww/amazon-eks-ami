@@ -37,7 +37,11 @@ ifeq ($(arch), arm64)
 	ami_name ?= amazon-eks-arm64-node$(OS)-$(K8S_VERSION_MINOR)-v$(shell date +'%Y%m%d')
 else
 	instance_type ?= m5.large
-	ami_name ?= amazon-eks-node$(OS)-$(K8S_VERSION_MINOR)-v$(shell date +'%Y%m%d')
+	ifeq ($(nvidia_build), true)
+	    ami_name ?= amazon-eks-gpu-node$(OS)-$(K8S_VERSION_MINOR)-v$(shell date +'%Y%m%d')
+	else
+	    ami_name ?= amazon-eks-node$(OS)-$(K8S_VERSION_MINOR)-v$(shell date +'%Y%m%d')
+	endif
 endif
 
 ifeq ($(aws_region), cn-northwest-1)

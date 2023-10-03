@@ -27,6 +27,8 @@
     "kubernetes_build_date": null,
     "kubernetes_version": null,
     "launch_block_device_mappings_volume_size": null,
+    "nvidia_build": null,
+    "nvidia_major_version": null,
     "pause_container_version": null,    
     "pull_cni_from_github": null,
     "remote_folder": null,
@@ -181,6 +183,18 @@
         "CACHE_CONTAINER_IMAGES={{user `cache_container_images`}}",
         "WORKING_DIR={{user `working_dir`}}",
         "SSM_AGENT_VERSION={{user `ssm_agent_version`}}"
+      ]
+    },
+    {
+      "type": "shell",
+      "script": "../amazon-eks-ami/scripts/install-nvidia.sh",
+      "environment_vars": [
+        "NVIDIA_BUILD={{user `nvidia_build`}}",
+        "NVIDIA_MAJOR_VERSION={{user `nvidia_major_version`}}",
+        "WORKING_DIR={{user `working_dir`}}",
+        "AWS_REGION={{user `binary_bucket_region`}}",
+        "KUBERNETES_VERSION={{user `kubernetes_version`}}",
+        "KERNEL_VERSION={{user `kernel_version`}}"
       ]
     },
     {

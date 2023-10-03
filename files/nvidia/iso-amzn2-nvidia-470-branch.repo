@@ -1,0 +1,9 @@
+[amzn2-nvidia-470-branch]
+name=Amazon Linux 2 Nvidia repository
+mirrorlist=http://amazonlinux.$awsregion.$awsdomain/$releasever/amzn2-nvidia/$target/$basearch/mirror.list-1110dd56f69bfed733216e477f1ddc3d4b256f2bf73871d89003d3a7e7478a17
+priority=20
+gpgcheck=0
+enabled=1
+metadata_expire=300
+mirrorlist_expire=300
+report_instanceid=yes
