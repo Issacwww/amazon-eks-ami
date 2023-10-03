@@ -187,7 +187,7 @@
     },
     {
       "type": "shell",
-      "script": "../amazon-eks-ami/scripts/install-nvidia.sh",
+      "script": "{{template_dir}}/scripts/install-nvidia.sh",
       "environment_vars": [
         "NVIDIA_BUILD={{user `nvidia_build`}}",
         "NVIDIA_MAJOR_VERSION={{user `nvidia_major_version`}}",
@@ -196,6 +196,25 @@
         "KUBERNETES_VERSION={{user `kubernetes_version`}}",
         "KERNEL_VERSION={{user `kernel_version`}}"
       ]
+    },
+    {
+      "type": "shell",
+      "script": "{{template_dir}}/scripts/install-efa.sh",
+      "environment_vars": [
+        "NVIDIA_BUILD={{user `nvidia_build`}}",
+        "KUBERNETES_VERSION={{user `kubernetes_version`}}",
+        "AWS_REGION={{user `binary_bucket_region`}}"
+      ]
+    },
+    {
+      "type": "shell",
+      "expect_disconnect": true,
+      "script": "../amazon-eks-ami/scripts/limit-c-states.sh",
+      "environment_vars": [
+        "NVIDIA_BUILD={{user `nvidia_build`}}",
+        "KUBERNETES_VERSION={{user `kubernetes_version`}}"
+      ],
+      "pause_after": "90s"
     },
     {
       "type": "shell",
