@@ -16,12 +16,12 @@ fi
 # rsa keys are not supported in al2023, switch to ed25519
 # delete the upgrade kernel provisioner as we don't need it for al2023
 cat "${PACKER_TEMPLATE_FILE}" \
-  | jq '._comment = "All template variables are enumerated here; and most variables have a default value defined in eks-worker-al2023-variables.json"' \
+  | jq '._comment = "All template variables are enumerated here; and most variables have a default value defined in al2023/eks-worker-variables.json"' \
   | jq '.variables.temporary_key_pair_type = "ed25519"' \
   | jq 'del(.provisioners[5])' \
   | jq 'del(.provisioners[5])' \
   | jq 'del(.provisioners[5])' \
-    > "${PACKER_TEMPLATE_FILE/al2/al2023}"
+    > "$(dirname "${PACKER_TEMPLATE_FILE}")/../AL2023/$(basename "${PACKER_TEMPLATE_FILE}")"
 
 # use newer versions of containerd and runc, do not install docker
 # use al2023 6.1 minimal image
@@ -31,4 +31,4 @@ cat "${PACKER_DEFAULT_VARIABLE_FILE}" \
   | jq '.containerd_version = "*" | .runc_version = "*" | .docker_version = "" ' \
   | jq '.source_ami_filter_name = "al2023-ami-minimal-2023.*-kernel-6.1-x86_64"' \
   | jq '.volume_type = "gp3"' \
-    > "${PACKER_DEFAULT_VARIABLE_FILE/al2/al2023}"
+    > "$(dirname "${PACKER_DEFAULT_VARIABLE_FILE}")/../AL2023/$(basename "${PACKER_DEFAULT_VARIABLE_FILE}")"

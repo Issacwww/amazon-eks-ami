@@ -1,7 +1,11 @@
 MAKEFILE_DIR := $(shell dirname $(realpath $(firstword $(MAKEFILE_LIST))))
-
-PACKER_DEFAULT_VARIABLE_FILE ?= $(MAKEFILE_DIR)/eks-worker-al2-variables.json
-PACKER_TEMPLATE_FILE ?= $(MAKEFILE_DIR)/eks-worker-al2.json
+AL_VARIANT ?= AL2
+VALID_VARIANTS := AL2 AL2023
+ifneq ($(filter $(AL_VARIANT),$(VALID_VARIANTS)), $(AL_VARIANT))
+  $(error Invalid AL_VARIANT: $(AL_VARIANT). Must be one of [$(VALID_VARIANTS)])
+endif
+PACKER_DEFAULT_VARIABLE_FILE ?= $(MAKEFILE_DIR)/JSON/$(AL_VARIANT)/eks-worker-variables.json
+PACKER_TEMPLATE_FILE ?= $(MAKEFILE_DIR)/JSON/$(AL_VARIANT)/eks-worker.json
 PACKER_BINARY ?= packer
 AVAILABLE_PACKER_VARIABLES := $(shell $(PACKER_BINARY) inspect -machine-readable $(PACKER_TEMPLATE_FILE) | grep 'template-variable' | awk -F ',' '{print $$4}')
 
@@ -13,30 +17,17 @@ K8S_VERSION_MINOR := $(word 1,${K8S_VERSION_PARTS}).$(word 2,${K8S_VERSION_PARTS
 # otherwise, expands to 'false'
 packer_variable_file_contains = $(if $(PACKER_VARIABLE_FILE),$(shell grep -Fq $1 $(PACKER_VARIABLE_FILE) && echo true || echo false),false)
 
-# expands to 'true' if the version comparison is affirmative
-# otherwise expands to 'false'
-vercmp = $(shell $(MAKEFILE_DIR)/files/bin/vercmp "$1" "$2" "$3")
-
-# Docker is not present on 1.25+ AMI's
-# TODO: remove this when 1.24 reaches EOL
-ifeq ($(call vercmp,$(kubernetes_version),gteq,1.25.0), true)
-	# do not tag the AMI with the Docker version
-	docker_version ?= none
-	# do not include the Docker version in the AMI description
-	ami_component_description ?= (k8s: {{ user `kubernetes_version` }}, containerd: {{ user `containerd_version` }})
-endif
-
+# override ami name based on the AL variant and arch
 AMI_VERSION ?= v$(shell date '+%Y%m%d')
 AMI_VARIANT ?= amazon-eks
-ifneq (,$(findstring al2023, $(PACKER_TEMPLATE_FILE)))
+arch ?= x86_64
+instance_type ?= m5.large
+ifeq ($(AL_VARIANT), AL2023)
 	AMI_VARIANT := $(AMI_VARIANT)-al2023
 endif
-arch ?= x86_64
 ifeq ($(arch), arm64)
 	instance_type ?= m6g.large
 	AMI_VARIANT := $(AMI_VARIANT)-arm64
-else
-	instance_type ?= m5.large
 endif
 ifeq ($(enable_fips), true)
 	AMI_VARIANT := $(AMI_VARIANT)-fips
@@ -51,6 +42,17 @@ ifeq ($(aws_region), us-gov-west-1)
 	source_ami_owners ?= 045324592363
 endif
 
+# include the override configs for the k8s version if it exists
+override_file_name = $(MAKEFILE_DIR)/JSON/$(AL_VARIANT)/k8sConfigOverried/v$(K8S_VERSION_MINOR)-worker-variables.json
+CONFIG_FILE := $(wildcard $(override_file_name))
+ifeq ($(CONFIG_FILE),)
+    $(info Configuration file does not exist, doing nothing)
+else
+    $(info Loading variables for $(AL_VARIANT) and k8s v$(K8S_VERSION_MINOR))
+    $(shell hack/json-to-makefile.sh $(CONFIG_FILE) > temp_makefile)
+    include temp_makefile
+endif
+
 T_RED := \e[0;31m
 T_GREEN := \e[0;32m
 T_YELLOW := \e[0;33m
@@ -60,7 +62,7 @@ T_RESET := \e[0m
 k8s=1.28
 
 .PHONY: build
-build: ## Build EKS Optimized AL2 AMI
+build: ## Build EKS Optimized AMI, default using AL2, use AL_VARIANT=AL2023 for AL2023 AMI
 	$(MAKE) k8s $(shell hack/latest-binaries.sh $(k8s))
 
 # ensure that these flags are equivalent to the rules in the .editorconfig
@@ -110,35 +112,36 @@ $(foreach packerVar,$(PACKER_VARIABLES),-var $(packerVar)='$($(packerVar))')
 
 .PHONY: validate
 validate: ## Validate packer config
+	@echo "PACKER_VAR_FLAGS: $(PACKER_VAR_FLAGS) \n\nPACKER_TEMPLATE_FILE: $(PACKER_TEMPLATE_FILE)"
 	$(PACKER_BINARY) validate $(PACKER_VAR_FLAGS) $(PACKER_TEMPLATE_FILE)
 
 .PHONY: k8s
-k8s: validate ## Build default K8s version of EKS Optimized AL2 AMI
+k8s: validate ## Build default K8s version of EKS Optimized AMI
 	@echo "$(T_GREEN)Building AMI for version $(T_YELLOW)$(kubernetes_version)$(T_GREEN) on $(T_YELLOW)$(arch)$(T_RESET)"
 	$(PACKER_BINARY) build -timestamp-ui -color=false $(PACKER_VAR_FLAGS) $(PACKER_TEMPLATE_FILE)
 
 .PHONY: 1.23
-1.23: ## Build EKS Optimized AL2 AMI - K8s 1.23
+1.23: ## Build EKS Optimized AMI - K8s 1.23, default using AL2, use AL_VARIANT=AL2023 for AL2023 AMI
 	$(MAKE) k8s $(shell hack/latest-binaries.sh 1.23)
 
 .PHONY: 1.24
-1.24: ## Build EKS Optimized AL2 AMI - K8s 1.24
+1.24: ## Build EKS Optimized AMI - K8s 1.24, default using AL2, use AL_VARIANT=AL2023 for AL2023 AMI
 	$(MAKE) k8s $(shell hack/latest-binaries.sh 1.24)
 
 .PHONY: 1.25
-1.25: ## Build EKS Optimized AL2 AMI - K8s 1.25
+1.25: ## Build EKS Optimized AMI - K8s 1.25, default using AL2, use AL_VARIANT=AL2023 for AL2023 AMI
 	$(MAKE) k8s $(shell hack/latest-binaries.sh 1.25)
 
 .PHONY: 1.26
-1.26: ## Build EKS Optimized AL2 AMI - K8s 1.26
+1.26: ## Build EKS Optimized AMI - K8s 1.26, default using AL2, use AL_VARIANT=AL2023 for AL2023 AMI
 	$(MAKE) k8s $(shell hack/latest-binaries.sh 1.26)
 
 .PHONY: 1.27
-1.27: ## Build EKS Optimized AL2 AMI - K8s 1.27
+1.27: ## Build EKS Optimized AMI - K8s 1.27, default using AL2, use AL_VARIANT=AL2023 for AL2023 AMI
 	$(MAKE) k8s $(shell hack/latest-binaries.sh 1.27)
 
 .PHONY: 1.28
-1.28: ## Build EKS Optimized AL2 AMI - K8s 1.28
+1.28: ## Build EKS Optimized AMI - K8s 1.28, default using AL2, use AL_VARIANT=AL2023 for AL2023 AMI
 	$(MAKE) k8s $(shell hack/latest-binaries.sh 1.28)
 
 .PHONY: lint-docs

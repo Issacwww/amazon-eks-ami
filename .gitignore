@@ -1,3 +1,5 @@
+*.iml
+temp_makefile
 *manifest.json
 *.swp
 .idea
