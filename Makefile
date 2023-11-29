@@ -4,8 +4,8 @@ VALID_VARIANTS := AL2 AL2023
 ifneq ($(filter $(AL_VARIANT),$(VALID_VARIANTS)), $(AL_VARIANT))
   $(error Invalid AL_VARIANT: $(AL_VARIANT). Must be one of [$(VALID_VARIANTS)])
 endif
-PACKER_DEFAULT_VARIABLE_FILE ?= $(MAKEFILE_DIR)/JSON/$(AL_VARIANT)/eks-worker-variables.json
-PACKER_TEMPLATE_FILE ?= $(MAKEFILE_DIR)/JSON/$(AL_VARIANT)/eks-worker.json
+PACKER_DEFAULT_VARIABLE_FILE ?= $(MAKEFILE_DIR)/packer_templates/$(AL_VARIANT)/eks-worker-variables.json
+PACKER_TEMPLATE_FILE ?= $(MAKEFILE_DIR)/packer_templates/$(AL_VARIANT)/eks-worker.json
 PACKER_BINARY ?= packer
 AVAILABLE_PACKER_VARIABLES := $(shell $(PACKER_BINARY) inspect -machine-readable $(PACKER_TEMPLATE_FILE) | grep 'template-variable' | awk -F ',' '{print $$4}')
 
@@ -43,7 +43,7 @@ ifeq ($(aws_region), us-gov-west-1)
 endif
 
 # include the override configs for the k8s version if it exists
-override_file_name = $(MAKEFILE_DIR)/JSON/$(AL_VARIANT)/k8sConfigOverride/v$(K8S_VERSION_MINOR)-worker-variables.json
+override_file_name = $(MAKEFILE_DIR)/packer_templates/$(AL_VARIANT)/variables_override/v$(K8S_VERSION_MINOR)-worker-variables.json
 CONFIG_FILE := $(wildcard $(override_file_name))
 ifeq ($(CONFIG_FILE),)
     $(info Configuration file does not exist, doing nothing)
