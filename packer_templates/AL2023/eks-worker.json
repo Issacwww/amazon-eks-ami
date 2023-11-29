@@ -81,6 +81,12 @@
           "volume_type": "{{user `volume_type`}}",
           "volume_size": 20,
           "delete_on_termination": true
+        },
+        {
+          "device_name": "/dev/xvdb",
+          "volume_type": "{{user `volume_type`}}",
+          "volume_size": 20,
+          "delete_on_termination": true
         }
       ],
       "aws_polling": {
