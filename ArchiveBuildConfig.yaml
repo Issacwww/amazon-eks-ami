@@ -10,7 +10,7 @@ dependencies:
       - src: files/
       - src: scripts/
       - src: log-collector-script/
-      - src: JSON/
+      - src: packer_templates/
     files:
       - src: Makefile
       - src: .git-commit

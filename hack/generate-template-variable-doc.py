@@ -8,11 +8,11 @@ whereami = os.path.abspath(__file__)
 os.chdir(os.path.dirname(whereami))
 
 template = {}
-with open('../JSON/AL2/eks-worker.json') as template_file:
+with open('../packer_templates/AL2/eks-worker.json') as template_file:
     template = json.load(template_file)
 
 default_vars = {}
-with open('../JSON/AL2/eks-worker-variables.json') as default_var_file:
+with open('../packer_templates/AL2/eks-worker-variables.json') as default_var_file:
     default_vars = json.load(default_var_file)
 
 all_vars = {}
