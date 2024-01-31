@@ -219,7 +219,7 @@ func (ksc *kubeletConfig) withVersionToggles(kubeletVersion string, flags map[st
 	}
 }
 
-func (ksc *kubeletConfig) withCloudProvider(cfg *api.NodeConfig, flags map[string]string) {
+func (ksc *kubeletConfig) withCloudProvider(cfg *api.NodeConfig, flags map[string]string) error {
 	// ref: https://github.com/kubernetes/kubernetes/pull/121367
 	flags["cloud-provider"] = "external"
 
@@ -231,6 +231,17 @@ func (ksc *kubeletConfig) withCloudProvider(cfg *api.NodeConfig, flags map[strin
 	// use ec2 instance-id as node hostname which is unique, stable, and incurs
 	// no additional requests
 	// flags["hostname-override"] = cfg.Status.Instance.ID
+	// TODO: remove util.GetPrivateDNSNameWithRetry and switch back to line#233 once KCP manifest rolled out
+	//privateDnsName, err := getPrivateDNSName(context.TODO(), imds.New(imds.Options{}))
+	privateDnsName, err := util.GetPrivateDNSNameWithRetry(cfg)
+	if err != nil {
+		return err
+	}
+	if privateDnsName != "" {
+		zap.L().Info("Setting hostname-override to detected privateDNSName", zap.String("privateDNSName", privateDnsName))
+		flags["hostname-override"] = privateDnsName
+	}
+	return nil
 }
 
 // When the DefaultReservedResources flag is enabled, override the kubelet
@@ -260,7 +271,9 @@ func (k *kubelet) GenerateKubeletConfig(cfg *api.NodeConfig) (*kubeletConfig, er
 	}
 
 	kubeletConfig.withVersionToggles(kubeletVersion, k.flags)
-	kubeletConfig.withCloudProvider(cfg, k.flags)
+	if err := kubeletConfig.withCloudProvider(cfg, k.flags); err != nil {
+		return nil, err
+	}
 	kubeletConfig.withDefaultReservedResources()
 
 	return &kubeletConfig, nil
@@ -378,4 +391,20 @@ func getNodeIp(ctx context.Context, imdsClient *imds.Client, cfg *api.NodeConfig
 	default:
 		return "", fmt.Errorf("invalid ip-family. %s is not one of %v", ipFamily, []api.IPFamily{api.IPFamilyIPv4, api.IPFamilyIPv6})
 	}
+}
+
+func getPrivateDNSName(ctx context.Context, imdsClient *imds.Client) (string, error) {
+	zap.L().Info("Fetching privateDNSName via imds")
+	response, err := imdsClient.GetMetadata(ctx, &imds.GetMetadataInput{
+		Path: "hostname",
+	})
+	if err != nil {
+		return "", err
+	}
+
+	privateDNSName, err := io.ReadAll(response.Content)
+	if err != nil {
+		return "", err
+	}
+	return string(privateDNSName), nil
 }

@@ -19,6 +19,8 @@ require (
 	sigs.k8s.io/controller-runtime v0.17.0
 )
 
+require github.com/aws/aws-sdk-go-v2/service/ec2 v1.146.0 // indirect
+
 require dario.cat/mergo v1.0.0 // direct
 
 require (

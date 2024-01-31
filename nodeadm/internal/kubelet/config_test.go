@@ -109,7 +109,7 @@ func TestProviderID(t *testing.T) {
 	for _, test := range tests {
 		kubeletAruments := make(map[string]string)
 		kubetConfig := defaultKubeletSubConfig()
-		kubetConfig.withCloudProvider(&nodeConfig, kubeletAruments)
+		_ = kubetConfig.withCloudProvider(&nodeConfig, kubeletAruments)
 		assert.Equal(t, test.expectedCloudProvider, kubeletAruments["cloud-provider"])
 		if kubeletAruments["cloud-provider"] == "external" {
 			assert.Equal(t, *kubetConfig.ProviderID, providerId)
