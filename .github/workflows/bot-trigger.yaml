@@ -10,5 +10,9 @@ jobs:
     runs-on: ubuntu-latest
     permissions: write-all
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
       - uses: ./.github/actions/bot
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
