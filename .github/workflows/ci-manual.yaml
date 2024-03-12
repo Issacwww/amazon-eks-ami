@@ -25,9 +25,18 @@ on:
         options:
           - "build"
           - "test"
+      os_distro:
+        description: 'Operating System Distributions (comma-separated, e.g., al2,al2023)'
+        required: false
+        type: string
+      kubernetes_versions:
+        description: 'Kubernetes Versions (comma-separated, e.g., 1.21,1.22)'
+        required: false
+        type: string
       build_arguments:
         required: false
         type: string
+
 jobs:
   setup:
     runs-on: ubuntu-latest
@@ -42,12 +51,10 @@ jobs:
       run: |
         echo "git_sha_short=$(echo ${{ inputs.git_sha }} | rev | cut -c-7 | rev)" >> $GITHUB_OUTPUT
         echo "workflow_run_url=https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}" >> $GITHUB_OUTPUT
-        # grab supported versions directly from eksctl
-        wget --no-verbose -O eksctl.tar.gz "https://github.com/weaveworks/eksctl/releases/latest/download/eksctl_Linux_amd64.tar.gz"
-        tar xzf eksctl.tar.gz && chmod +x ./eksctl
-        echo "kubernetes_versions=$(./eksctl version --output json | jq -c .EKSServerSupportedVersions)" >> $GITHUB_OUTPUT
         echo "build_id=ci-${{ inputs.pr_number }}-${{ needs.setup.outputs.git_sha_short }}-${{ inputs.uuid }}" >> $GITHUB_OUTPUT
         echo 'ci_step_name_prefix=CI:' >> $GITHUB_OUTPUT
+        echo "kubernetes_versions=$(jq -Rn --arg input ${{ input.kubernetes_versions }} '($input | split(","))')" >> $GITHUB_OUTPUT
+        echo "os_distro==$(jq -Rn --arg input ${{ input.os_distro }} '($input | split(","))')" >> $GITHUB_OUTPUT
 
   notify-start:
     runs-on: ubuntu-latest
@@ -77,7 +84,7 @@ jobs:
       fail-fast: false
       matrix:
         k8s_version: ${{ fromJson(needs.setup.outputs.kubernetes_versions) }}
-        os_distro: [al2, al2023]
+        os_distro: ${{ fromJson(needs.setup.outputs.os_distro) }}
     steps:
       - uses: actions/checkout@v3
         with:
