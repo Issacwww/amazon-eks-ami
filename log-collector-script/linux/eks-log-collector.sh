@@ -31,10 +31,12 @@ readonly DAYS_10=$(date -d "-10 days" '+%Y-%m-%d %H:%M')
 INSTANCE_ID=""
 INIT_TYPE=""
 PACKAGE_TYPE=""
+IMDS_TOKEN=""
 
 # Script run defaults
 ignore_introspection='false'
 ignore_metrics='false'
+eks_hybrid='false'
 
 REQUIRED_UTILS=(
   timeout
@@ -98,6 +100,8 @@ help() {
   echo ""
   echo "   --ignore_metrics Variable To ignore prometheus metrics collection; Pass this flag if DISABLE_METRICS enabled on CNI"
   echo ""
+  echo "   --eks_hybrid Variable To denote that the script is running on an EKS Hybrid node; This will skip IMDS queries for AWS region and instance ID"
+  echo ""
   echo "   --help  Show this help message."
   echo ""
 }
@@ -115,6 +119,9 @@ parse_options() {
         eval "${param}"="${val}"
         ;;
       ignore_metrics)
+        eval "${param}"="${val}"
+        ;;
+      eks_hybrid)
         eval "${param}"="${val}"
         ;;
       help)
@@ -182,8 +189,14 @@ systemd_check() {
   fi
 }
 
-# Get token for IMDSv2 calls
-IMDS_TOKEN=$(curl -X PUT "http://169.254.169.254/latest/api/token" -H "X-aws-ec2-metadata-token-ttl-seconds: 360")
+load_imds_token() {
+  # Get token for IMDSv2 calls
+  IMDS_TOKEN=$(curl -X PUT -s --max-time 10 --retry 2 "http://169.254.169.254/latest/api/token" -H "X-aws-ec2-metadata-token-ttl-seconds: 360")
+  if [[ $? -ne 0 ]]; then
+    warning "Unable to reach EC2 Metadata Service. Skipping Instance Id, EC2 Region and EC2 AZ"
+    IMDS_TOKEN=""
+  fi
+}
 
 create_directories() {
   # Make sure the directory the script lives in is there. Not an issue if
@@ -197,6 +210,10 @@ create_directories() {
 }
 
 get_instance_id() {
+  if [[ -z "${IMDS_TOKEN}" ]]; then
+    return
+  fi
+
   INSTANCE_ID_FILE="/var/lib/cloud/data/instance-id"
 
   if grep -q '^i-' "$INSTANCE_ID_FILE"; then
@@ -213,6 +230,10 @@ get_instance_id() {
 }
 
 get_region() {
+  if [[ -z "${IMDS_TOKEN}" ]]; then
+    return
+  fi
+
   if REGION=$(curl -H "X-aws-ec2-metadata-token: $IMDS_TOKEN" -f -s --max-time 10 --retry 5 http://169.254.169.254/latest/meta-data/placement/region); then
     echo "${REGION}" > "${COLLECT_DIR}"/system/region.txt
   else
@@ -258,6 +279,10 @@ init() {
   is_root
   systemd_check
   get_pkgtype
+
+  if [[ "${eks_hybrid}" == "false" ]]; then
+    load_imds_token
+  fi
 }
 
 collect() {
@@ -356,15 +381,21 @@ get_iptables_info() {
     ip6tables-save > "${COLLECT_DIR}"/networking/ip6tables-save.txt
   fi
 
-  if ! command -v ipvsadm && command -v ipset > /dev/null 2>&1; then
-    echo "IPVS Linux kernel module not installed" | tee ipvsadm.txt ipset.txt
-  elif command -v ipvsadm > /dev/null 2>&1; then
+  if ! command -v ipvsadm > /dev/null 2>&1; then
+    echo "ipvsadm not installed" | tee "${COLLECT_DIR}"/networking/ipvsadm.txt
+  else
     # check that ip_vs module is loaded in get_modinfo()
     try "collect ipvs information"
-    ipvsadm --save | tee "${COLLECT_DIR}"/networking/ipvsadm.txt && sed -i '1s/^/add:service/server \tprotocol \tvirtual-server \tscheduler algorithm \treal-server \n/' "${COLLECT_DIR}"/networking/ipvsadm.txt
+    ipvsadm --save | tee "${COLLECT_DIR}"/networking/ipvsadm.txt
+    ok -e "\n" | tee -a "${COLLECT_DIR}"/networking/ipvsadm.txt
     ipvsadm --list --numeric --rate | tee -a "${COLLECT_DIR}"/networking/ipvsadm.txt
     ok -e "\n" | tee -a "${COLLECT_DIR}"/networking/ipvsadm.txt
     ipvsadm --list --numeric --stats --exact | tee -a "${COLLECT_DIR}"/networking/ipvsadm.txt
+  fi
+
+  if ! command -v ipset > /dev/null 2>&1; then
+    echo "ipset not installed" | tee "${COLLECT_DIR}"/networking/ipset.txt
+  else
     ipset --list | tee "${COLLECT_DIR}"/networking/ipset.txt
     ok -e "\n" | tee -a "${COLLECT_DIR}"/networking/ipset.txt
     ipset --save | tee -a "${COLLECT_DIR}"/networking/ipset.txt
@@ -853,6 +884,16 @@ get_nvidia_bug_report() {
   ok
 }
 
+banner() {
+  echo >&2 "\
+****************************************************************************************
+* WARNING: The log bundle collected by this script may contain sensitive information.  *
+*                                                                                      *
+* Please review the contents of the log bundle carefully and redact or obfuscate       *
+* any information you do not wish to be accessible before sharing it with others.      *
+****************************************************************************************"
+}
+
 # -----------------------------------------------------------------------------
 # Entrypoint
 parse_options "$@"
@@ -860,3 +901,4 @@ parse_options "$@"
 collect
 pack
 finished
+banner
